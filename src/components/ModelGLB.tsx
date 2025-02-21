@@ -4,7 +4,7 @@ import { useGLTF, Text } from '@react-three/drei';
 import { useCustomizationStore } from '../store/customization';
 import * as THREE from 'three';
 
-export function ModelGLB({ modelPath = '/cake5.glb' }) {
+export function ModelGLB({ modelPath = '/cake3.glb' }) {
     const meshRef = useRef<THREE.Group>(null!);
     const { scene } = useGLTF(modelPath);
     const {
