@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { TextureConfig, TextConfig, ToppingConfig, ImageConfig } from '../types/types'
+import { TextureConfig, TextConfig, ToppingConfig, ImageConfig } from '../types/types';
 
 interface CustomizationStore {
     selectedPart: string | null;
@@ -17,6 +17,7 @@ interface CustomizationStore {
     setSelectedPart: (part: string | null) => void;
     setColorForPart: (part: string, color: string) => void;
     setTextureForPart: (part: string, config: TextureConfig) => void;
+    removeTextureFromPart: (part: string) => void;
     addTextToPart: (part: string, config: TextConfig) => void;
     removeTextFromPart: (part: string, textId: string) => void;
     addToppingToPart: (part: string, config: ToppingConfig) => void;
@@ -51,44 +52,59 @@ export const useCustomizationStore = create<CustomizationStore>((set) => ({
     isPlaying: true,
 
     setSelectedPart: (part) => set({ selectedPart: part }),
+
     setColorForPart: (part, color) => set((state) => ({
         colors: { ...state.colors, [part]: color }
     })),
+
     setTextureForPart: (part, config) => set((state) => ({
         textures: { ...state.textures, [part]: config }
     })),
+
+    removeTextureFromPart: (part) => set((state) => {
+        const newTextures = { ...state.textures };
+        delete newTextures[part];
+        return { textures: newTextures };
+    }),
+
     addTextToPart: (part, config) => set((state) => ({
         texts: { ...state.texts, [`${part}-${Date.now()}`]: config }
     })),
+
     removeTextFromPart: (part, textId) => set((state) => {
         const newTexts = { ...state.texts };
         delete newTexts[textId];
         return { texts: newTexts };
     }),
+
     addToppingToPart: (part, config) => set((state) => ({
         toppings: {
             ...state.toppings,
             [part]: [...(state.toppings[part] || []), config]
         }
     })),
+
     removeToppingFromPart: (part, index) => set((state) => ({
         toppings: {
             ...state.toppings,
             [part]: state.toppings[part]?.filter((_, i) => i !== index) || []
         }
     })),
+
     addImageToPart: (part, config) => set((state) => ({
         images: {
             ...state.images,
             [part]: [...(state.images[part] || []), config]
         }
     })),
+
     removeImageFromPart: (part, index) => set((state) => ({
         images: {
             ...state.images,
             [part]: state.images[part]?.filter((_, i) => i !== index) || []
         }
     })),
+
     updateImageConfig: (part, index, config) => set((state) => ({
         images: {
             ...state.images,
@@ -97,6 +113,7 @@ export const useCustomizationStore = create<CustomizationStore>((set) => ({
             ) || []
         }
     })),
+
     setScale: (scale) => set({ scale }),
     setRoughness: (roughness) => set({ roughness }),
     setMetalness: (metalness) => set({ metalness }),

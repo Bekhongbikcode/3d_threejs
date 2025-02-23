@@ -1,103 +1,146 @@
 import React from 'react';
+import { Sliders, Move, Repeat, Maximize, X } from 'lucide-react';
 import { useCustomizationStore } from '../store/customization';
 
-export function TextureControls() {
-    const { selectedPart, textures, setTextureForPart } = useCustomizationStore();
+interface TextureOption {
+    id: string;
+    path: string;
+    name: string;
+}
 
-    const textureOptions = [
-        { id: 'sprinkles', path: '/file.svg', name: 'Sprinkles' },
-        { id: 'chocolate', path: '/next.svg', name: 'Chocolate' },
-        { id: 'marble', path: '/vercel.svg', name: 'Marble' },
-        { id: 'dots', path: '/window.svg', name: 'Dots' }
+export function TextureControls() {
+    const {
+        selectedPart,
+        textures,
+        setTextureForPart,
+        removeTextureFromPart
+    } = useCustomizationStore();
+
+    const textureOptions: TextureOption[] = [
+        { id: 'sprinkles', path: '/imagecake.jpg', name: 'Sprinkles' },
+        { id: 'chocolate', path: '/imagecake1.jpeg', name: 'Chocolate' },
+        { id: 'marble', path: '/imagecake2.jpeg', name: 'Marble' },
+        { id: 'dots', path: '/imagecake3.jpg', name: 'Dots' }
     ];
 
     if (!selectedPart) return null;
 
     const currentTexture = textures[selectedPart];
 
-    return (
-        <div className="space-y-4 p-4 border rounded-lg bg-white shadow-sm">
-            <h3 className="text-lg font-medium text-gray-900">Textures</h3>
+    const handleTextureSelect = (texturePath: string) => {
+        setTextureForPart(selectedPart, {
+            texture: texturePath,
+            scale: 1,
+            rotation: 0,
+            repeat: 1
+        });
+    };
 
-            <div className="grid grid-cols-2 gap-2">
-                {textureOptions.map((texture) => (
-                    <button
-                        key={texture.id}
-                        onClick={() => setTextureForPart(selectedPart, {
-                            texture: texture.path,
-                            scale: 1,
-                            rotation: 0,
-                            repeat: 1
-                        })}
-                        className="relative p-2 border rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <img
-                            src={texture.path}
-                            alt={texture.name}
-                            className="w-full h-20 object-cover rounded"
-                        />
-                        <span className="block mt-1 text-sm text-gray-600">
-                            {texture.name}
-                        </span>
-                    </button>
-                ))}
+    return (
+        <div className="w-full max-w-md bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="p-4 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                    <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                        <Sliders className="w-5 h-5" />
+                        Texture Controls
+                    </h2>
+                    {currentTexture && (
+                        <button
+                            onClick={() => removeTextureFromPart(selectedPart)}
+                            className="text-gray-500 hover:text-red-500"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    )}
+                </div>
             </div>
 
-            {currentTexture && (
-                <div className="space-y-3">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                            Scale
-                        </label>
-                        <input
-                            type="range"
-                            min="0.1"
-                            max="5"
-                            step="0.1"
-                            value={currentTexture.scale}
-                            onChange={(e) => setTextureForPart(selectedPart, {
-                                ...currentTexture,
-                                scale: parseFloat(e.target.value)
-                            })}
-                            className="w-full mt-1"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                            Rotation
-                        </label>
-                        <input
-                            type="range"
-                            min="0"
-                            max="360"
-                            value={currentTexture.rotation}
-                            onChange={(e) => setTextureForPart(selectedPart, {
-                                ...currentTexture,
-                                rotation: parseInt(e.target.value)
-                            })}
-                            className="w-full mt-1"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                            Repeat
-                        </label>
-                        <input
-                            type="range"
-                            min="1"
-                            max="10"
-                            value={currentTexture.repeat}
-                            onChange={(e) => setTextureForPart(selectedPart, {
-                                ...currentTexture,
-                                repeat: parseInt(e.target.value)
-                            })}
-                            className="w-full mt-1"
-                        />
-                    </div>
+            <div className="p-4 space-y-6">
+                <div className="grid grid-cols-2 gap-3">
+                    {textureOptions.map((texture) => (
+                        <button
+                            key={texture.id}
+                            onClick={() => handleTextureSelect(texture.path)}
+                            className={`relative overflow-hidden rounded-lg transition-all duration-200 
+                                ${currentTexture?.texture === texture.path
+                                    ? 'ring-2 ring-blue-500'
+                                    : 'hover:ring-2 hover:ring-blue-400'}`}
+                        >
+                            <div className="aspect-square w-full">
+                                <img
+                                    src={texture.path}
+                                    alt={texture.name}
+                                    className="w-full h-full object-cover"
+                                />
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-2">
+                                <span className="block text-sm font-medium text-white text-center">
+                                    {texture.name}
+                                </span>
+                            </div>
+                        </button>
+                    ))}
                 </div>
-            )}
+
+                {currentTexture && (
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <Maximize className="w-4 h-4" />
+                                Scale
+                            </label>
+                            <input
+                                type="range"
+                                min={0.1}
+                                max={5}
+                                step={0.1}
+                                value={currentTexture.scale}
+                                onChange={(e) => setTextureForPart(selectedPart, {
+                                    ...currentTexture,
+                                    scale: parseFloat(e.target.value)
+                                })}
+                                className="w-full"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <Move className="w-4 h-4" />
+                                Rotation
+                            </label>
+                            <input
+                                type="range"
+                                min={0}
+                                max={360}
+                                value={currentTexture.rotation}
+                                onChange={(e) => setTextureForPart(selectedPart, {
+                                    ...currentTexture,
+                                    rotation: parseInt(e.target.value)
+                                })}
+                                className="w-full"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                                <Repeat className="w-4 h-4" />
+                                Repeat
+                            </label>
+                            <input
+                                type="range"
+                                min={1}
+                                max={10}
+                                value={currentTexture.repeat}
+                                onChange={(e) => setTextureForPart(selectedPart, {
+                                    ...currentTexture,
+                                    repeat: parseInt(e.target.value)
+                                })}
+                                className="w-full"
+                            />
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
