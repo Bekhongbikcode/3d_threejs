@@ -23,19 +23,54 @@ export function ModelGLB({ modelPath = '/cake3.glb' }) {
     const { scene } = useGLTF(modelPath);
     const {
         colors,
+        customizedParts,
         selectedPart,
         scale,
         animationSpeed,
         isPlaying,
         setSelectedPart,
+        setColorForPart,
         textures,
-        texts
+        texts,
+        setClickPosition,
+        roughness,
+        metalness
     } = useCustomizationStore();
 
     const [originalMaterials] = useState<Map<string, THREE.Material>>(new Map());
     const [hovered, setHovered] = useState<string | null>(null);
     const [loadedTextures, setLoadedTextures] = useState<Map<string, THREE.Texture>>(new Map());
     const [rotation, setRotation] = useState(0);
+    const [initialLoad, setInitialLoad] = useState(true);
+
+    // Save original materials on first load and initialize colors
+    useEffect(() => {
+        const initialColors: Record<string, string> = {};
+
+        scene.traverse((child) => {
+            if (child instanceof THREE.Mesh && child.material) {
+                if (!originalMaterials.has(child.uuid)) {
+                    originalMaterials.set(child.uuid, child.material.clone());
+
+                    // Extract the original color if it's a standard material
+                    if (child.material instanceof THREE.MeshStandardMaterial && child.name) {
+                        const color = child.material.color.getHexString();
+                        initialColors[child.name] = `#${color}`;
+                    }
+                }
+            }
+        });
+
+        // Initialize store with original colors if they haven't been customized
+        if (initialLoad) {
+            Object.entries(initialColors).forEach(([partName, color]) => {
+                if (!customizedParts.includes(partName)) {
+                    setColorForPart(partName, color, false); // false = not a custom color
+                }
+            });
+            setInitialLoad(false);
+        }
+    }, [scene, initialLoad, setColorForPart, customizedParts]);
 
     // Implement rotation animation using useFrame
     useFrame((_, delta) => {
@@ -45,56 +80,15 @@ export function ModelGLB({ modelPath = '/cake3.glb' }) {
         }
     });
 
-    // Debug scene hierarchy
-    useEffect(() => {
-        console.log('Scene hierarchy:');
-        scene.traverse((object) => {
-            if (object instanceof THREE.Mesh) {
-                console.log({
-                    name: object.name,
-                    type: object.type,
-                    geometry: {
-                        type: object.geometry.type,
-                        hasUVs: !!object.geometry.attributes.uv,
-                        uvs: object.geometry.attributes.uv?.array,
-                    },
-                    material: {
-                        type: object.material.type,
-                        properties: {
-                            transparent: object.material.transparent,
-                            side: object.material.side,
-                            visible: object.material.visible,
-                            opacity: object.material.opacity,
-                        }
-                    },
-                    position: object.position,
-                    rotation: object.rotation,
-                    scale: object.scale,
-                });
-            }
-        });
-    }, [scene]);
-
-    // Enhanced texture loading with debug
+    // Enhanced texture loading
     useEffect(() => {
         const textureLoader = new THREE.TextureLoader();
 
         const loadTexture = async (textureUrl: string) => {
-            console.log('Loading texture:', textureUrl);
             return new Promise<THREE.Texture>((resolve, reject) => {
                 textureLoader.load(
                     textureUrl,
                     (texture) => {
-                        console.log('Texture loaded:', {
-                            url: textureUrl,
-                            size: {
-                                width: texture.image.width,
-                                height: texture.image.height
-                            },
-                            format: texture.format,
-                            type: texture.type
-                        });
-
                         // Configure texture
                         texture.colorSpace = THREE.SRGBColorSpace;
                         texture.flipY = false;
@@ -123,7 +117,7 @@ export function ModelGLB({ modelPath = '/cake3.glb' }) {
         };
     }, [textures]);
 
-    // Enhanced material update with debug
+    // Update materials with colors and textures
     useEffect(() => {
         scene.traverse((child) => {
             if (child instanceof THREE.Mesh) {
@@ -134,14 +128,19 @@ export function ModelGLB({ modelPath = '/cake3.glb' }) {
                     // Basic material properties
                     newMaterial.transparent = true;
                     newMaterial.side = THREE.DoubleSide;
+                    newMaterial.roughness = roughness;
+                    newMaterial.metalness = metalness;
                     newMaterial.needsUpdate = true;
 
-                    // Apply color
+                    // Apply color (use custom color if specified, otherwise use the color from store)
                     if (colors[child.name]) {
                         newMaterial.color.set(colors[child.name]);
+                    } else {
+                        // Fallback to original color if available
+                        newMaterial.color.copy(originalMaterial.color);
                     }
 
-                    // Apply texture with detailed logging
+                    // Apply texture
                     const textureConfig = textures[child.name];
                     if (textureConfig && loadedTextures.has(textureConfig.texture)) {
                         const texture = loadedTextures.get(textureConfig.texture)!.clone();
@@ -155,22 +154,6 @@ export function ModelGLB({ modelPath = '/cake3.glb' }) {
                         // Apply texture to material
                         newMaterial.map = texture;
                         newMaterial.needsUpdate = true;
-
-                        console.log('Material updated for:', child.name, {
-                            hasTexture: !!newMaterial.map,
-                            textureProperties: {
-                                repeat: texture.repeat.toArray(),
-                                rotation: texture.rotation,
-                                wrapS: texture.wrapS,
-                                wrapT: texture.wrapT
-                            },
-                            materialProperties: {
-                                transparent: newMaterial.transparent,
-                                side: newMaterial.side,
-                                visible: newMaterial.visible,
-                                needsUpdate: newMaterial.needsUpdate
-                            }
-                        });
                     }
 
                     // Apply selection/hover effects
@@ -187,7 +170,7 @@ export function ModelGLB({ modelPath = '/cake3.glb' }) {
                 }
             }
         });
-    }, [colors, selectedPart, hovered, originalMaterials, textures, loadedTextures]);
+    }, [colors, selectedPart, hovered, originalMaterials, textures, loadedTextures, roughness, metalness]);
 
     return (
         <group
@@ -205,10 +188,24 @@ export function ModelGLB({ modelPath = '/cake3.glb' }) {
             }}
             onClick={(e) => {
                 e.stopPropagation();
+
+                // Store the selected part name (object name)
                 setSelectedPart(e.object.name);
+
+                // Store the exact click position in 3D space
+                const clickPosition = {
+                    x: e.point.x,
+                    y: e.point.y,
+                    z: e.point.z
+                };
+
+                // Save the click position for text placement
+                setClickPosition(clickPosition);
             }}
         >
             <primitive object={scene} />
+
+            {/* Render text elements properly positioned relative to the cake */}
             {Object.entries(texts).map(([textId, config]: [string, TextConfig]) => (
                 <Text
                     key={textId}
@@ -216,6 +213,10 @@ export function ModelGLB({ modelPath = '/cake3.glb' }) {
                     rotation={[config.rotation.x, config.rotation.y, config.rotation.z]}
                     fontSize={config.size}
                     color={config.color}
+                    anchorX="center"
+                    anchorY="middle"
+                    depthTest={true}
+                    renderOrder={10}
                 >
                     {config.content}
                 </Text>

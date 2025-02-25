@@ -7,6 +7,7 @@ import { Controls } from '@/components/Controls';
 import { TextureControls } from '@/components/TextureControls';
 import { TextControls } from '@/components/TextControls';
 import { ToppingControls } from '@/components/ToppingControls';
+import { ToastContainer } from '@/components/ToastSaveShow';
 
 export default function Model3DCustom() {
     return (
@@ -28,6 +29,9 @@ export default function Model3DCustom() {
                     <OrbitControls />
                 </Canvas>
             </div>
+
+            {/* Global Toast Container - mounted once at app level */}
+            <ToastContainer />
         </div>
     );
 }

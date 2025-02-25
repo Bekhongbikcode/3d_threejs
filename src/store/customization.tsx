@@ -1,9 +1,38 @@
 import { create } from 'zustand';
-import { TextureConfig, TextConfig, ToppingConfig, ImageConfig } from '../types/types';
+
+interface TextConfig {
+    content: string;
+    size: number;
+    color: string;
+    position: { x: number; y: number; z: number };
+    rotation: { x: number; y: number; z: number };
+}
+
+interface TextureConfig {
+    texture: string;
+    repeat: number;
+    rotation: number;
+}
+
+interface ToppingConfig {
+    model: string;
+    position: { x: number; y: number; z: number };
+    rotation: { x: number; y: number; z: number };
+    scale: number;
+}
+
+interface ImageConfig {
+    url: string;
+    position: { x: number; y: number; z: number };
+    rotation: { x: number; y: number; z: number };
+    scale: number;
+}
 
 interface CustomizationStore {
     selectedPart: string | null;
+    clickPosition: { x: number; y: number; z: number } | null;
     colors: Record<string, string>;
+    customizedParts: string[]; // Track which parts have been customized
     textures: Record<string, TextureConfig>;
     texts: Record<string, TextConfig>;
     toppings: Record<string, ToppingConfig[]>;
@@ -15,11 +44,13 @@ interface CustomizationStore {
     isPlaying: boolean;
 
     setSelectedPart: (part: string | null) => void;
-    setColorForPart: (part: string, color: string) => void;
+    setClickPosition: (position: { x: number; y: number; z: number } | null) => void;
+    setColorForPart: (part: string, color: string, isCustom?: boolean) => void;
     setTextureForPart: (part: string, config: TextureConfig) => void;
     removeTextureFromPart: (part: string) => void;
     addTextToPart: (part: string, config: TextConfig) => void;
     removeTextFromPart: (part: string, textId: string) => void;
+    updateTextConfig: (textId: string, config: Partial<TextConfig>) => void;
     addToppingToPart: (part: string, config: ToppingConfig) => void;
     removeToppingFromPart: (part: string, index: number) => void;
     addImageToPart: (part: string, config: ImageConfig) => void;
@@ -34,13 +65,9 @@ interface CustomizationStore {
 
 export const useCustomizationStore = create<CustomizationStore>((set) => ({
     selectedPart: null,
-    colors: {
-        'cake-base': '#FFE4B5',
-        'frosting-top': '#FFC0CB',
-        'frosting-middle': '#FFB6C1',
-        'frosting-bottom': '#FF69B4',
-        'decoration': '#FF1493'
-    },
+    clickPosition: null,
+    colors: {},  // We'll populate this with original colors from the model
+    customizedParts: [], // Track which parts have been customized by the user
     textures: {},
     texts: {},
     toppings: {},
@@ -53,12 +80,26 @@ export const useCustomizationStore = create<CustomizationStore>((set) => ({
 
     setSelectedPart: (part) => set({ selectedPart: part }),
 
-    setColorForPart: (part, color) => set((state) => ({
-        colors: { ...state.colors, [part]: color }
-    })),
+    setClickPosition: (position) => set({ clickPosition: position }),
+
+    setColorForPart: (part, color, isCustom = true) => set((state) => {
+        // Only add to customizedParts if this is a custom color change and not already in the list
+        const customizedParts = isCustom && !state.customizedParts.includes(part)
+            ? [...state.customizedParts, part]
+            : state.customizedParts;
+
+        return {
+            colors: { ...state.colors, [part]: color },
+            customizedParts
+        };
+    }),
 
     setTextureForPart: (part, config) => set((state) => ({
-        textures: { ...state.textures, [part]: config }
+        textures: { ...state.textures, [part]: config },
+        // When a texture is set, also mark the part as customized
+        customizedParts: !state.customizedParts.includes(part)
+            ? [...state.customizedParts, part]
+            : state.customizedParts
     })),
 
     removeTextureFromPart: (part) => set((state) => {
@@ -67,9 +108,23 @@ export const useCustomizationStore = create<CustomizationStore>((set) => ({
         return { textures: newTextures };
     }),
 
-    addTextToPart: (part, config) => set((state) => ({
-        texts: { ...state.texts, [`${part}-${Date.now()}`]: config }
-    })),
+    addTextToPart: (part, config) => set((state) => {
+        // Use clicked position when available, otherwise use provided position or default
+        const position = state.clickPosition || config.position || { x: 0, y: 1.5, z: 0 };
+
+        // Create a new unique ID for the text using part name and timestamp
+        const textId = `${part}-${Date.now()}`;
+
+        return {
+            texts: {
+                ...state.texts,
+                [textId]: {
+                    ...config,
+                    position // Use the actual clicked position
+                }
+            }
+        };
+    }),
 
     removeTextFromPart: (part, textId) => set((state) => {
         const newTexts = { ...state.texts };
@@ -77,11 +132,22 @@ export const useCustomizationStore = create<CustomizationStore>((set) => ({
         return { texts: newTexts };
     }),
 
+    updateTextConfig: (textId, config) => set((state) => ({
+        texts: {
+            ...state.texts,
+            [textId]: { ...state.texts[textId], ...config }
+        }
+    })),
+
     addToppingToPart: (part, config) => set((state) => ({
         toppings: {
             ...state.toppings,
             [part]: [...(state.toppings[part] || []), config]
-        }
+        },
+        // Mark part as customized when adding toppings
+        customizedParts: !state.customizedParts.includes(part)
+            ? [...state.customizedParts, part]
+            : state.customizedParts
     })),
 
     removeToppingFromPart: (part, index) => set((state) => ({
@@ -95,7 +161,11 @@ export const useCustomizationStore = create<CustomizationStore>((set) => ({
         images: {
             ...state.images,
             [part]: [...(state.images[part] || []), config]
-        }
+        },
+        // Mark part as customized when adding images
+        customizedParts: !state.customizedParts.includes(part)
+            ? [...state.customizedParts, part]
+            : state.customizedParts
     })),
 
     removeImageFromPart: (part, index) => set((state) => ({
